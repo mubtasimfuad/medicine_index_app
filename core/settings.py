@@ -48,6 +48,12 @@ AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 # Application definition
 REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "inventory.utils.custom_exception_handler",
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticatedOrReadOnly",
+    ),
 }
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -59,8 +65,22 @@ INSTALLED_APPS = [
     "inventory",
     "storages",
     "rest_framework",
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
+
+    'authentication',  
+
+
 ]
 
+# JWT Settings
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -91,7 +111,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "core.wsgi.application"
-TEST_RUNNER = 'pytest_django.runner.DiscoverRunner'
+TEST_RUNNER = "pytest_django.runner.DiscoverRunner"
 
 
 # Database

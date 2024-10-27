@@ -3,6 +3,8 @@
 from rest_framework.views import APIView
 from rest_framework import status
 from rest_framework.response import Response
+
+from authentication.permissions import IsAdminOrReadOnly
 from .serializers import MedicineDetailSerializer
 from ..models import MedicineDetail
 from ..exceptions import FeaturedMedicineInvalidError, NotFoundError, ValidationError
@@ -10,6 +12,8 @@ from ..utils import api_response
 
 
 class MedicineDetailView(APIView):
+    permission_classes = [IsAdminOrReadOnly]
+
     def get(self, request, pk=None):
         """Retrieve a single or list of medicines."""
         try:

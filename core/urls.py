@@ -1,5 +1,8 @@
+from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
-    path('api/', include('inventory.api.urls')),  # Including API URLs
+    path('admin/', admin.site.urls),
+    path('api/auth/', include('authentication.urls')),  # Authentication routes
+    path('api/', include('inventory.api.urls')),        # Other app routes
 ]
