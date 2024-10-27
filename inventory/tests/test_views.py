@@ -2,6 +2,7 @@ from decimal import Decimal
 import pytest
 from rest_framework.test import APIClient
 from rest_framework import status
+from rest_framework_simplejwt.tokens import RefreshToken
 from inventory.models import (
     MedicineDetail,
     GenericName,
@@ -9,20 +10,34 @@ from inventory.models import (
     MedicineForm,
     Manufacturer,
 )
+from django.contrib.auth.models import User
 
 client = APIClient()
 
 
+@pytest.fixture
+def admin_user():
+    """Create an admin user for authenticated requests."""
+    return User.objects.create_superuser(username="admin", password="password123")
+
+
+@pytest.fixture
+def authenticated_client(admin_user):
+    """Provide an authenticated client for admin requests."""
+    refresh = RefreshToken.for_user(admin_user)
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+    return client
+
+
 @pytest.mark.django_db
-def test_get_medicine_detail_list():
-    # Ensure the endpoint is accessible
-    response = client.get("/api/medicines/")
+def test_get_medicine_detail_list(authenticated_client):
+    response = authenticated_client.get("/api/medicines/")
     assert response.status_code == status.HTTP_200_OK
     assert isinstance(response.data["data"], list)
 
 
 @pytest.mark.django_db
-def test_create_medicine_with_featured_constraint():
+def test_create_medicine_with_featured_constraint(authenticated_client):
     generic_name = GenericName.objects.create(name="Azithromycin")
     category = MedicineCategory.objects.create(
         name="Antibiotic", description="Antibiotic class"
@@ -44,17 +59,14 @@ def test_create_medicine_with_featured_constraint():
         "is_featured": True,
     }
 
-    # First request to create a featured medicine
-    response = client.post("/api/medicines/", data=data)
+    # Create a featured medicine
+    response = authenticated_client.post("/api/medicines/", data=data)
     assert response.status_code == status.HTTP_201_CREATED
 
-    # Attempt to create another featured medicine for the same generic name
-    data["name"] = "Azithromycin Syrup"
-    data["batch_number"] = "B130"  # Ensure unique batch number
-    response = client.post("/api/medicines/", data=data)
+    # Try to create another featured medicine with the same generic name
+    data["name"], data["batch_number"] = "Azithromycin Syrup", "B130"
+    response = authenticated_client.post("/api/medicines/", data=data)
     assert response.status_code == status.HTTP_400_BAD_REQUEST
-
-    # Adjust assertion to check within the custom response structure
     assert (
         "Only one featured medicine is allowed per generic name"
         in response.data["message"]
@@ -62,8 +74,7 @@ def test_create_medicine_with_featured_constraint():
 
 
 @pytest.mark.django_db
-def test_update_medicine_detail():
-    # Setup initial data
+def test_update_medicine_detail(authenticated_client):
     generic_name = GenericName.objects.create(name="Paracetamol")
     category = MedicineCategory.objects.create(
         name="Analgesic", description="Pain reliever"
@@ -86,9 +97,9 @@ def test_update_medicine_detail():
         is_featured=True,
     )
 
-    # Update the medicine entry
+    # Update the medicine
     update_data = {"name": "Paracetamol Extra Strength", "price": Decimal("6.99")}
-    response = client.put(
+    response = authenticated_client.put(
         f"/api/medicines/{medicine.pk}/", data=update_data, format="json"
     )
     assert response.status_code == status.HTTP_200_OK
@@ -97,16 +108,13 @@ def test_update_medicine_detail():
 
 
 @pytest.mark.django_db
-def test_partial_update_medicine_detail():
-    # Setup initial data
+def test_partial_update_medicine_detail(authenticated_client):
+    """Test partial update of a medicine detail."""
+    # Create required related objects
     generic_name = GenericName.objects.create(name="Ibuprofen")
-    category = MedicineCategory.objects.create(
-        name="Analgesic", description="Pain reliever"
-    )
+    category = MedicineCategory.objects.create(name="Analgesic", description="Pain reliever")
     form = MedicineForm.objects.create(form_type="TABLET", description="Tablet form")
-    manufacturer = Manufacturer.objects.create(
-        name="Pharma Inc.", contact_info="123-456-7890"
-    )
+    manufacturer = Manufacturer.objects.create(name="Pharma Inc.", contact_info="123-456-7890")
 
     # Create a medicine entry
     medicine = MedicineDetail.objects.create(
@@ -121,21 +129,16 @@ def test_partial_update_medicine_detail():
         is_featured=True,
     )
 
-    # Perform a partial update (e.g., only update the description)
+    # Perform partial update with PUT if PATCH is unsupported
     partial_update_data = {"description": "Updated pain relief description"}
-    response = client.put(
-        f"/api/medicines/{medicine.pk}/",
-        data=partial_update_data,
-        format="json",
-        partial=True,
+    response = authenticated_client.put(
+        f"/api/medicines/{medicine.pk}/", data=partial_update_data, format="json"
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.data["data"]["description"] == "Updated pain relief description"
-
-
+    
 @pytest.mark.django_db
-def test_delete_medicine_detail():
-    # Setup initial data
+def test_delete_medicine_detail(authenticated_client):
     generic_name = GenericName.objects.create(name="Amoxicillin")
     category = MedicineCategory.objects.create(
         name="Antibiotic", description="Antibiotic class"
@@ -157,10 +160,10 @@ def test_delete_medicine_detail():
         batch_number="B125",
     )
 
-    # Delete the medicine entry
-    response = client.delete(f"/api/medicines/{medicine.pk}/")
+    # Delete the medicine
+    response = authenticated_client.delete(f"/api/medicines/{medicine.pk}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    # Confirm the entry no longer exists
-    response = client.get(f"/api/medicines/{medicine.pk}/")
+    # Confirm deletion
+    response = authenticated_client.get(f"/api/medicines/{medicine.pk}/")
     assert response.status_code == status.HTTP_404_NOT_FOUND

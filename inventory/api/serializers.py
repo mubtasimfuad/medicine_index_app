@@ -38,3 +38,23 @@ class MedicineDetailSerializer(serializers.ModelSerializer):
                     "Only one featured medicine is allowed per generic name."
                 )
         return data
+
+class GenericNameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GenericName
+        fields = "__all__"
+
+class MedicineCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicineCategory
+        fields = "__all__"
+
+class MedicineFormSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicineForm
+        fields = "__all__"
+
+class ManufacturerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Manufacturer
+        fields = "__all__"
