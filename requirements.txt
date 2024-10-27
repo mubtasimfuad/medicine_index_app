@@ -1,0 +1,10 @@
+django
+djangorestframework
+psycopg2-binary
+django-environ
+celery
+redis
+mysqlclient
+Pillow
+django-storages
+djangorestframework

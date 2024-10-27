@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+
+# Django
+db.sqlite3
+*.log
+.env
+.env.*
+/media/
+/staticfiles/
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+
+# Byte-compiled files and caches
+.DS_Store
+*.egg-info/
+*.egg
+*.bak
+
+# Docker
+*.bak
+docker-compose.override.yml
+env/
