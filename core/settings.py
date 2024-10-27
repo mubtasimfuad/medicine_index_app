@@ -91,6 +91,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "core.wsgi.application"
+TEST_RUNNER = 'pytest_django.runner.DiscoverRunner'
 
 
 # Database
