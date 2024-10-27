@@ -8,3 +8,6 @@ mysqlclient
 Pillow
 django-storages
 djangorestframework
+pytest 
+pytest-django
+djangorestframework-simplejwt
