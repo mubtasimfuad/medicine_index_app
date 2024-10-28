@@ -11,3 +11,4 @@ djangorestframework
 pytest 
 pytest-django
 djangorestframework-simplejwt
+django-redis 

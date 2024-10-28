@@ -1,5 +1,6 @@
+# inventory/api/urls.py
 from django.urls import path
-from .views import MedicineDetailView
+from .views import MedicineDetailView, MedicineListView
 from .auxiliary_views import (
     GenericNameListCreateView,
     GenericNameRetrieveUpdateDestroyView,
@@ -12,8 +13,9 @@ from .auxiliary_views import (
 )
 
 urlpatterns = [
-    path("medicines/", MedicineDetailView.as_view(), name="medicine-list"),
+     path("medicines/", MedicineListView.as_view(), name="medicine-list"),
     path("medicines/<uuid:pk>/", MedicineDetailView.as_view(), name="medicine-detail"),
+
     path(
         "generic-names/", GenericNameListCreateView.as_view(), name="generic-name-list"
     ),

@@ -1,3 +1,4 @@
+#inventory/tests/test_auxiliary_views.py
 import pytest
 from rest_framework import status
 from rest_framework.test import APIClient

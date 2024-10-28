@@ -55,6 +55,61 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ),
 }
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://localhost:6379/1",  
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "CONNECTION_POOL_KWARGS": {"max_connections": 100, "encoding": "utf-8"},
+        },
+    }
+}
+
+CACHE_TTL = 60 * 15  # Default cache timeout of 15 minutes
+
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "standard": {
+            "format": "{asctime} - {name} - {levelname} - {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "standard",
+        },
+        "error_file": {
+            "class": "logging.FileHandler",
+            "filename": "logs/error.log",
+            "formatter": "standard",
+            "level": "ERROR",
+        },
+        "app_file": {
+            "class": "logging.FileHandler",
+            "filename": "logs/app.log",
+            "formatter": "standard",
+            "level": "INFO",
+        },
+    },
+    "loggers": {
+        "error_logger": {
+            "handlers": ["error_file", "console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "app_logger": {
+            "handlers": ["app_file", "console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -65,21 +120,19 @@ INSTALLED_APPS = [
     "inventory",
     "storages",
     "rest_framework",
-    'rest_framework_simplejwt',
-    'rest_framework_simplejwt.token_blacklist',
-
-    'authentication',  
-
-
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
+    "authentication",
 ]
 
 # JWT Settings
 from datetime import timedelta
+
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-    'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 MIDDLEWARE = [

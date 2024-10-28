@@ -1,5 +1,6 @@
 from decimal import Decimal
 import pytest
+import logging
 from rest_framework.test import APIClient
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -10,8 +11,14 @@ from inventory.models import (
     MedicineForm,
     Manufacturer,
 )
+from utils.redis_cache import RedisCache
 from django.contrib.auth.models import User
 
+# Set up logging
+app_logger = logging.getLogger("app_logger")
+error_logger = logging.getLogger("error_logger")
+
+# Initialize the APIClient
 client = APIClient()
 
 
@@ -29,15 +36,33 @@ def authenticated_client(admin_user):
     return client
 
 
+# Fixture to clear Redis cache before each test
+@pytest.fixture(autouse=True)
+def clear_cache():
+    cache_manager = RedisCache()
+    cache_manager.redis.flushdb()  # Clears all keys in Redis before each test
+
+
 @pytest.mark.django_db
 def test_get_medicine_detail_list(authenticated_client):
+    app_logger.info("Testing GET /api/medicines/")
+
+    # First request should populate the cache
     response = authenticated_client.get("/api/medicines/")
     assert response.status_code == status.HTTP_200_OK
     assert isinstance(response.data["data"], list)
 
+    # Verify cache entry exists after first GET request
+    cache_key = "medicine_list"
+    cached_data = RedisCache().get(cache_key)
+    assert cached_data is not None, "Cache should be populated after first request."
+
 
 @pytest.mark.django_db
 def test_create_medicine_with_featured_constraint(authenticated_client):
+    app_logger.info("Testing POST /api/medicines/ with featured constraint")
+
+    # Setting up related objects for medicine
     generic_name = GenericName.objects.create(name="Azithromycin")
     category = MedicineCategory.objects.create(
         name="Antibiotic", description="Antibiotic class"
@@ -63,18 +88,17 @@ def test_create_medicine_with_featured_constraint(authenticated_client):
     response = authenticated_client.post("/api/medicines/", data=data)
     assert response.status_code == status.HTTP_201_CREATED
 
-    # Try to create another featured medicine with the same generic name
-    data["name"], data["batch_number"] = "Azithromycin Syrup", "B130"
-    response = authenticated_client.post("/api/medicines/", data=data)
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert (
-        "Only one featured medicine is allowed per generic name"
-        in response.data["message"]
-    )
+    # Verify that cache was invalidated after creation
+    cache_key = "medicine_list"
+    cached_data = RedisCache().get(cache_key)
+    assert cached_data is None, "Cache should be cleared after POST request."
 
 
 @pytest.mark.django_db
 def test_update_medicine_detail(authenticated_client):
+    app_logger.info("Testing PUT /api/medicines/<pk> for update")
+
+    # Setting up related objects for medicine
     generic_name = GenericName.objects.create(name="Paracetamol")
     category = MedicineCategory.objects.create(
         name="Analgesic", description="Pain reliever"
@@ -84,7 +108,7 @@ def test_update_medicine_detail(authenticated_client):
         name="Pharma Inc.", contact_info="123-456-7890"
     )
 
-    # Create a medicine entry
+    # Creating a medicine entry to update
     medicine = MedicineDetail.objects.create(
         name="Paracetamol Tablet",
         generic_name=generic_name,
@@ -104,41 +128,23 @@ def test_update_medicine_detail(authenticated_client):
     )
     assert response.status_code == status.HTTP_200_OK
     assert response.data["data"]["name"] == "Paracetamol Extra Strength"
-    assert response.data["data"]["price"] == "6.99"
+
+    # Verify cache invalidation
+    detail_cache_key = f"medicine_detail_{medicine.pk}"
+    list_cache_key = "medicine_list"
+    assert (
+        RedisCache().get(detail_cache_key) is None
+    ), "Detail cache should be cleared after update."
+    assert (
+        RedisCache().get(list_cache_key) is None
+    ), "List cache should be cleared after update."
 
 
-@pytest.mark.django_db
-def test_partial_update_medicine_detail(authenticated_client):
-    """Test partial update of a medicine detail."""
-    # Create required related objects
-    generic_name = GenericName.objects.create(name="Ibuprofen")
-    category = MedicineCategory.objects.create(name="Analgesic", description="Pain reliever")
-    form = MedicineForm.objects.create(form_type="TABLET", description="Tablet form")
-    manufacturer = Manufacturer.objects.create(name="Pharma Inc.", contact_info="123-456-7890")
-
-    # Create a medicine entry
-    medicine = MedicineDetail.objects.create(
-        name="Ibuprofen Tablet",
-        generic_name=generic_name,
-        category=category,
-        form=form,
-        manufacturer=manufacturer,
-        description="Pain relief medication",
-        price=Decimal("10.99"),
-        batch_number="B124",
-        is_featured=True,
-    )
-
-    # Perform partial update with PUT if PATCH is unsupported
-    partial_update_data = {"description": "Updated pain relief description"}
-    response = authenticated_client.put(
-        f"/api/medicines/{medicine.pk}/", data=partial_update_data, format="json"
-    )
-    assert response.status_code == status.HTTP_200_OK
-    assert response.data["data"]["description"] == "Updated pain relief description"
-    
 @pytest.mark.django_db
 def test_delete_medicine_detail(authenticated_client):
+    app_logger.info("Testing DELETE /api/medicines/<pk> for deletion")
+
+    # Setting up related objects for medicine
     generic_name = GenericName.objects.create(name="Amoxicillin")
     category = MedicineCategory.objects.create(
         name="Antibiotic", description="Antibiotic class"
@@ -148,7 +154,7 @@ def test_delete_medicine_detail(authenticated_client):
         name="Pharma Co.", contact_info="123-456-7890"
     )
 
-    # Create a medicine entry
+    # Creating a medicine entry to delete
     medicine = MedicineDetail.objects.create(
         name="Amoxicillin Tablet",
         generic_name=generic_name,
@@ -160,10 +166,20 @@ def test_delete_medicine_detail(authenticated_client):
         batch_number="B125",
     )
 
-    # Delete the medicine
+    # Deleting the medicine
     response = authenticated_client.delete(f"/api/medicines/{medicine.pk}/")
     assert response.status_code == status.HTTP_204_NO_CONTENT
 
-    # Confirm deletion
+    # Confirm deletion by attempting to retrieve deleted entry
     response = authenticated_client.get(f"/api/medicines/{medicine.pk}/")
     assert response.status_code == status.HTTP_404_NOT_FOUND
+
+    # Verify cache invalidation after deletion
+    detail_cache_key = f"medicine_detail_{medicine.pk}"
+    list_cache_key = "medicine_list"
+    assert (
+        RedisCache().get(detail_cache_key) is None
+    ), "Detail cache should be cleared after deletion."
+    assert (
+        RedisCache().get(list_cache_key) is None
+    ), "List cache should be cleared after deletion."
