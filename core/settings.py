@@ -58,7 +58,7 @@ REST_FRAMEWORK = {
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://localhost:6379/1",  
+        "LOCATION": "redis://localhost:6379/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
             "CONNECTION_POOL_KWARGS": {"max_connections": 100, "encoding": "utf-8"},
@@ -117,12 +117,15 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "inventory",
+    # main apps
+    "inventory.apps.InventoryConfig",
+    "authentication",
+    # third-party apps
     "storages",
     "rest_framework",
     "rest_framework_simplejwt",
     "rest_framework_simplejwt.token_blacklist",
-    "authentication",
+    "drf_yasg",
 ]
 
 # JWT Settings

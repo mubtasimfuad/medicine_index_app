@@ -128,6 +128,7 @@ class MedicineDetail(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    search_content = models.TextField(blank=True, editable=False)
 
     def clean(self):
         # Check if another featured medicine exists with the same generic name
@@ -143,8 +144,9 @@ class MedicineDetail(models.Model):
                 )
 
     def save(self, *args, **kwargs):
-        # Call the full_clean method before saving to ensure clean() is run
-        self.full_clean()  # This triggers the clean() method
+        # Populate search_content with concatenated values
+        self.search_content = f"{self.name} {self.generic_name.name}"
+        self.full_clean()  # Validate before saving
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -1,4 +1,5 @@
 from decimal import Decimal
+import json
 import pytest
 import logging
 from rest_framework.test import APIClient
@@ -183,3 +184,72 @@ def test_delete_medicine_detail(authenticated_client):
     assert (
         RedisCache().get(list_cache_key) is None
     ), "List cache should be cleared after deletion."
+
+@pytest.mark.django_db
+def test_medicine_search(authenticated_client):
+    app_logger.info("Testing GET /api/medicines/search/ with various queries and filters")
+
+    # Set up sample medicines with varying names and categories
+    generic_name1 = GenericName.objects.create(name="Ibuprofen")
+    generic_name2 = GenericName.objects.create(name="Amoxicillin")
+    category1 = MedicineCategory.objects.create(name="Painkiller", description="Pain relief")
+    category2 = MedicineCategory.objects.create(name="Antibiotic", description="Antibiotic class")
+    form = MedicineForm.objects.create(form_type="TABLET", description="Tablet form")
+    manufacturer = Manufacturer.objects.create(name="HealthCorp", contact_info="123-456-7890")
+
+    # Create medicines with varied names, generic names, and categories
+    MedicineDetail.objects.create(
+        name="Ibuprofen Tablet",
+        generic_name=generic_name1,
+        category=category1,
+        form=form,
+        manufacturer=manufacturer,
+        description="Relieves pain",
+        price=Decimal("9.99"),
+        batch_number="B100",
+        is_featured=False,
+    )
+    MedicineDetail.objects.create(
+        name="Amoxicillin Capsule",
+        generic_name=generic_name2,
+        category=category2,
+        form=form,
+        manufacturer=manufacturer,
+        description="Used to treat bacterial infections",
+        price=Decimal("15.99"),
+        batch_number="B101",
+        is_featured=True,
+    )
+
+    # Perform a search for "Ibuprofen" and verify correct results
+    search_query = {"q": "Ibuprofen"}
+    response = authenticated_client.get("/api/medicines/search/", search_query)
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["data"]) == 1
+    assert response.data["data"][0]["name"] == "Ibuprofen Tablet"
+
+    # Verify search result caching by checking if Redis cache exists
+    cache_key = f"medicine_search_{search_query['q']}"
+    cached_data = RedisCache().get(cache_key)
+    assert cached_data is not None, "Search results should be cached after initial query."
+
+    # Perform a search with filters applied (e.g., category = "Antibiotic")
+    search_query_with_filter = {"q": "Amoxicillin", "filters": json.dumps({"category": category2.id})}
+    response = authenticated_client.get("/api/medicines/search/", search_query_with_filter)
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["data"]) == 1
+    assert response.data["data"][0]["name"] == "Amoxicillin Capsule"
+
+    # Verify cache invalidation works by updating a medicine and ensuring cache is cleared
+    medicine = MedicineDetail.objects.get(name="Ibuprofen Tablet")
+    medicine.price = Decimal("11.99")
+    medicine.save()
+
+    # Check cache for the "Ibuprofen" query after the update to ensure invalidation
+    assert RedisCache().get(cache_key) is None, "Cache should be invalidated after updating medicine data."
+
+    # Retry search after invalidation to ensure fresh data
+    response = authenticated_client.get("/api/medicines/search/", search_query)
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["data"]) == 1
+    assert response.data["data"][0]["price"] == "11.99", "Updated price should reflect in search results"

@@ -1,11 +1,13 @@
-# utils/redis_cache.py
 
 import redis
 import json
 import logging
 from typing import Any
-from datetime import datetime
 import os
+
+# Setup app and error loggers
+app_logger = logging.getLogger("app_logger")
+error_logger = logging.getLogger("error_logger")
 
 
 class RedisCache:
@@ -13,19 +15,23 @@ class RedisCache:
         self, redis_url: str = os.getenv("REDIS_HOST", "redis://localhost:6379")
     ):
         self.redis = redis.from_url(redis_url)
-        self.logger = logging.getLogger(__name__)
 
     def get(self, key: str) -> Any:
         try:
             raw_data = self.redis.get(key)
             if raw_data:
+                app_logger.info(f"Cache hit for key: {key}")
                 try:
                     return json.loads(raw_data)
                 except (json.JSONDecodeError, TypeError):
+                    app_logger.warning(
+                        f"Non-JSON data retrieved from cache for key: {key}"
+                    )
                     return raw_data
+            app_logger.info(f"Cache miss for key: {key}")
             return None
         except redis.RedisError as e:
-            self.logger.error(f"Redis get error for key {key}: {e}")
+            error_logger.error(f"Redis get error for key '{key}': {e}")
             return None
 
     def set(self, key: str, value: Any, expiration: int = 3600):
@@ -35,35 +41,39 @@ class RedisCache:
                 self.redis.set(key, json_value, ex=expiration)
             else:
                 self.redis.set(key, str(value), ex=expiration)
+            app_logger.info(f"Set cache for key: {key} with expiration: {expiration}s")
         except redis.RedisError as e:
-            self.logger.error(f"Redis set error for key {key}: {e}")
+            error_logger.error(f"Redis set error for key '{key}': {e}")
 
     def delete(self, key: str):
         try:
             self.redis.delete(key)
+            app_logger.info(f"Deleted cache for key: {key}")
         except redis.RedisError as e:
-            self.logger.error(f"Redis delete error for key {key}: {e}")
+            error_logger.error(f"Redis delete error for key '{key}': {e}")
 
     def delete_pattern(self, pattern: str):
         try:
             for key in self.redis.scan_iter(match=pattern):
                 self.redis.delete(key)
-            self.logger.info(f"Deleted keys matching pattern: {pattern}")
+            app_logger.info(f"Deleted keys matching pattern: {pattern}")
         except redis.RedisError as e:
-            self.logger.error(f"Redis delete pattern error for pattern {pattern}: {e}")
+            error_logger.error(
+                f"Redis delete pattern error for pattern '{pattern}': {e}"
+            )
 
     # Lock acquisition
     def acquire_lock(self, lock_key: str, timeout: int = 10):
         """
         Acquire a lock for atomic operations.
-        Returns True if lock is acquired, False otherwise.
+        Returns the lock if acquired, None otherwise.
         """
         lock = self.redis.lock(lock_key, timeout=timeout)
         if lock.acquire(blocking=False):
-            self.logger.info(f"Acquired lock on key: {lock_key}")
+            app_logger.info(f"Acquired lock on key: {lock_key}")
             return lock
         else:
-            self.logger.warning(f"Failed to acquire lock on key: {lock_key}")
+            app_logger.warning(f"Failed to acquire lock on key: {lock_key}")
             return None
 
     # Lock release
@@ -73,6 +83,6 @@ class RedisCache:
         """
         try:
             lock.release()
-            self.logger.info(f"Released lock.")
+            app_logger.info("Released lock.")
         except redis.RedisError as e:
-            self.logger.error(f"Error releasing lock: {e}")
+            error_logger.error(f"Error releasing lock: {e}")

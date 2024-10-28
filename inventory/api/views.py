@@ -1,18 +1,26 @@
+# inventory/views.py
+
+import json
 import logging
 from rest_framework.views import APIView
 from rest_framework import status
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
+from django.db.models import Q
 from authentication.permissions import IsAdminOrReadOnly
+from inventory.exceptions import FeaturedMedicineInvalidError
 from inventory.utils import api_response
 from .serializers import MedicineDetailSerializer
 from ..models import MedicineDetail
-from ..exceptions import FeaturedMedicineInvalidError, NotFoundError
 from utils.redis_cache import RedisCache
 
-# Cache keys and lock definitions
+# Redis cache manager
 cache_manager = RedisCache()
+# Define cache keys and other constants
 MEDICINE_LIST_CACHE_KEY = "medicine_list"
 MEDICINE_DETAIL_CACHE_KEY_TEMPLATE = "medicine_detail_{}"
-MEDICINE_LIST_LOCK_KEY = "medicine_list_lock"
+SEARCH_CACHE_KEY_TEMPLATE = "medicine_search_{}"
+
 app_logger = logging.getLogger("app_logger")
 error_logger = logging.getLogger("error_logger")
 
@@ -21,7 +29,7 @@ class MedicineListView(APIView):
     permission_classes = [IsAdminOrReadOnly]
 
     def get(self, request):
-        """Retrieve a list of medicines."""
+        """Retrieve a list of medicines with caching."""
         try:
             app_logger.info("Attempting to retrieve cached medicine list")
             cached_data = cache_manager.get(MEDICINE_LIST_CACHE_KEY)
@@ -45,23 +53,13 @@ class MedicineListView(APIView):
             )
 
     def post(self, request):
-        """Create a new medicine entry and invalidate list cache."""
+        """Create a new medicine entry."""
         app_logger.info("POST request received to create a new medicine entry")
-        lock = cache_manager.acquire_lock(MEDICINE_LIST_LOCK_KEY)
-        if not lock:
-            error_logger.warning("Failed to acquire lock for POST /api/medicines/")
-            return api_response(
-                success=False,
-                message="Service is busy. Please try again.",
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
         try:
             serializer = MedicineDetailSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save()
-                cache_manager.delete(MEDICINE_LIST_CACHE_KEY)
-                app_logger.info("Created new medicine and invalidated list cache.")
+                app_logger.info("Created new medicine entry.")
                 return api_response(
                     success=True,
                     data=serializer.data,
@@ -87,15 +85,13 @@ class MedicineListView(APIView):
                 message="An error occurred while creating the medicine.",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        finally:
-            cache_manager.release_lock(lock)
 
 
 class MedicineDetailView(APIView):
     permission_classes = [IsAdminOrReadOnly]
 
     def get(self, request, pk):
-        """Retrieve a single medicine entry."""
+        """Retrieve a single medicine entry with caching."""
         cache_key = MEDICINE_DETAIL_CACHE_KEY_TEMPLATE.format(pk)
         try:
             app_logger.info(f"Fetching medicine entry with ID: {pk}")
@@ -127,16 +123,6 @@ class MedicineDetailView(APIView):
 
     def put(self, request, pk):
         """Update a specific medicine entry."""
-        lock_key = MEDICINE_LIST_LOCK_KEY
-        cache_key = MEDICINE_DETAIL_CACHE_KEY_TEMPLATE.format(pk)
-        lock = cache_manager.acquire_lock(lock_key)
-        if not lock:
-            return api_response(
-                success=False,
-                message="Service is busy. Please try again.",
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
         try:
             medicine = MedicineDetail.objects.get(pk=pk)
             serializer = MedicineDetailSerializer(
@@ -144,8 +130,6 @@ class MedicineDetailView(APIView):
             )
             if serializer.is_valid():
                 serializer.save()
-                cache_manager.delete(cache_key)
-                cache_manager.delete(MEDICINE_LIST_CACHE_KEY)
                 return api_response(
                     success=True,
                     data=serializer.data,
@@ -164,25 +148,12 @@ class MedicineDetailView(APIView):
                 message="Medicine not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
             )
-        finally:
-            cache_manager.release_lock(lock)
 
     def delete(self, request, pk):
         """Delete a specific medicine entry."""
-        lock = cache_manager.acquire_lock(MEDICINE_LIST_LOCK_KEY)
-        cache_key = MEDICINE_DETAIL_CACHE_KEY_TEMPLATE.format(pk)
-        if not lock:
-            return api_response(
-                success=False,
-                message="Service is busy. Please try again.",
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-
         try:
             medicine = MedicineDetail.objects.get(pk=pk)
             medicine.delete()
-            cache_manager.delete(cache_key)
-            cache_manager.delete(MEDICINE_LIST_CACHE_KEY)
             return api_response(
                 success=True,
                 message="Medicine deleted successfully.",
@@ -204,5 +175,97 @@ class MedicineDetailView(APIView):
                 message="An error occurred while deleting the medicine.",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        finally:
-            cache_manager.release_lock(lock)
+
+
+class MedicineSearchView(APIView):
+    """
+    A view to perform a full-text search on medicines with caching.
+    """
+
+    permission_classes = [IsAdminOrReadOnly]
+
+    @swagger_auto_schema(
+        operation_description="Search for medicines by name, generic name, or using specific filters. "
+        "Accessible to users with appropriate permissions.",
+        manual_parameters=[
+            openapi.Parameter(
+                "q",
+                openapi.IN_QUERY,
+                description="Search query string",
+                type=openapi.TYPE_STRING,
+                required=True,
+            ),
+            openapi.Parameter(
+                "filters",
+                openapi.IN_QUERY,
+                description="Additional filters in JSON format",
+                type=openapi.TYPE_STRING,
+            ),
+        ],
+        responses={
+            200: openapi.Response(
+                description="Search results",
+                schema=MedicineDetailSerializer(many=True),
+            ),
+            400: "Bad Request - Query parameter 'q' is required.",
+            403: "Forbidden - You do not have permission to access this resource.",
+            500: "Internal Server Error",
+        },
+    )
+    def get(self, request):
+        """Perform a full-text search on medicines with caching."""
+        query = request.query_params.get("q", "").strip()
+        filters = request.query_params.get("filters", "")
+        cache_key = SEARCH_CACHE_KEY_TEMPLATE.format(query)
+
+        # Validate required search parameter
+        if not query:
+            return api_response(
+                success=False,
+                message="Query parameter 'q' is required for search.",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Try to retrieve cached results
+        cached_data = cache_manager.get(cache_key)
+        if cached_data:
+            app_logger.info(f"Cache hit for search query: '{query}'")
+            return api_response(success=True, data=cached_data)
+
+        # Proceed with database search if cache miss
+        app_logger.info(f"Cache miss for search query: '{query}' - querying database")
+        try:
+            search_filter = Q(name__icontains=query) | Q(
+                generic_name__name__icontains=query
+            )
+
+            # Apply additional filters, if any
+            if filters:
+                try:
+                    filter_params = json.loads(filters)
+                    for key, value in filter_params.items():
+                        search_filter &= Q(**{key: value})
+                except json.JSONDecodeError:
+                    error_logger.error(f"Invalid JSON format for filters: {filters}")
+                    return api_response(
+                        success=False,
+                        message="Filters must be a valid JSON string.",
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            # Perform the search and serialize the results
+            medicines = MedicineDetail.objects.filter(search_filter).distinct()
+            serializer = MedicineDetailSerializer(medicines, many=True)
+            data = serializer.data
+
+            # Cache the search results
+            cache_manager.set(cache_key, data, expiration=600)  # Cache for 10 minutes
+            return api_response(success=True, data=data)
+
+        except Exception as e:
+            error_logger.error(f"Error in MedicineSearchView GET method: {str(e)}")
+            return api_response(
+                success=False,
+                message="An error occurred while searching for medicines.",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
