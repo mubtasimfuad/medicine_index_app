@@ -12,3 +12,6 @@ pytest
 pytest-django
 djangorestframework-simplejwt
 django-redis 
+drf_yasg
+gunicorn
+django-cors-headers

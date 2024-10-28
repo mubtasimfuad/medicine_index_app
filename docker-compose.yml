@@ -1,39 +1,31 @@
 version: '3.8'
 
 services:
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_DATABASE: ${DB_NAME}
-      MYSQL_USER: ${DB_USER}
-      MYSQL_PASSWORD: ${DB_PASSWORD}
-      MYSQL_ROOT_PASSWORD: root_password
-    volumes:
-      - mysql_data:/var/lib/mysql
-    networks:
-      - backend
-
   redis:
     image: redis:alpine
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: gunicorn --bind 0.0.0.0:8000 core.wsgi:application
     volumes:
-      - .:/app
-    ports:
-      - "8000:8000"
+      - .:/app  # Mount the current directory for code changes
+      - ./staticfiles:/app/staticfiles  # Ensure Nginx can access collected static files
     env_file:
       - .env
     depends_on:
-      - db
+      redis:
+        condition: service_healthy
     networks:
       - backend
-
-volumes:
-  mysql_data:
+    ports:
+      - "8000:8000"  # Make web accessible on port 8000 for internal proxying
 
 networks:
   backend:

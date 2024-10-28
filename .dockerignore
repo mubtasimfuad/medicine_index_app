@@ -1,0 +1,9 @@
+# Ignore unnecessary files
+.git
+__pycache__
+*.pyc
+*.log
+*.md
+tests/
+Dockerfile
+docker-compose.yml

@@ -1,4 +1,3 @@
-
 import redis
 import json
 import logging
@@ -11,9 +10,12 @@ error_logger = logging.getLogger("error_logger")
 
 
 class RedisCache:
-    def __init__(
-        self, redis_url: str = os.getenv("REDIS_HOST", "redis://localhost:6379")
-    ):
+    def __init__(self):
+        # Construct Redis URL using environment variables with redis:// prefix
+        redis_host = os.getenv("REDIS_HOST", "localhost")
+        redis_port = os.getenv("REDIS_PORT", "6379")
+        redis_url = f"redis://{redis_host}:{redis_port}/0"
+
         self.redis = redis.from_url(redis_url)
 
     def get(self, key: str) -> Any:

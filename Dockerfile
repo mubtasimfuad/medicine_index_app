@@ -1,4 +1,3 @@
-# Dockerfile
 FROM python:3.11
 
 WORKDIR /app
@@ -10,4 +9,7 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Collect static files for production use
+RUN python manage.py collectstatic --noinput
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "core.wsgi:application"]

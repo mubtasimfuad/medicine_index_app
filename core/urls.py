@@ -2,8 +2,10 @@ from django.contrib import admin
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 from django.urls import include, path, re_path
-
+from rest_framework.permissions import AllowAny
+from django.conf.urls.static import static
 from authentication import permissions
+from core import settings
 
 schema_view = get_schema_view(
     openapi.Info(
@@ -14,7 +16,7 @@ schema_view = get_schema_view(
         license=openapi.License(name="MIT License"),
     ),
     public=True,
-    permission_classes=(permissions.IsAdminOrReadOnly,),
+    permission_classes=(AllowAny,),
 )
 urlpatterns = [
     # Swagger UI
@@ -35,3 +37,5 @@ urlpatterns = [
     path("api/auth/", include("authentication.urls")),  # Authentication routes
     path("api/", include("inventory.api.urls")),  # Other app routes
 ]
+if settings.DEBUG:  # Only serve static files in development
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
