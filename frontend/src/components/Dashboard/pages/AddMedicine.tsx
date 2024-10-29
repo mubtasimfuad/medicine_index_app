@@ -13,6 +13,22 @@ import {
 } from "@mui/material";
 import api from "../../../services/api";
 
+// Map field names to user-friendly labels
+const fieldLabelMap: Record<string, string> = {
+  generic_name: "Generic Name",
+  category: "Category",
+  form: "Form",
+  manufacturer: "Manufacturer",
+  name: "Name",
+  description: "Description",
+  price: "Price",
+  stock_quantity: "Stock Quantity",
+  batch_number: "Batch Number",
+  unit_of_measurement: "Unit of Measurement",
+  prescription_required: "Prescription Required",
+  is_featured: "Featured Medicine",
+};
+
 const AddMedicine: React.FC = () => {
   const [medicineData, setMedicineData] = useState({
     name: "",
@@ -28,6 +44,7 @@ const AddMedicine: React.FC = () => {
     prescription_required: false,
     is_featured: false,
   });
+
   const [categories, setCategories] = useState<any[]>([]);
   const [forms, setForms] = useState<any[]>([]);
   const [manufacturers, setManufacturers] = useState<any[]>([]);
@@ -35,21 +52,19 @@ const AddMedicine: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchAuxiliaryData = async () => {
       setLoading(true);
       try {
-        // Fetch categories, forms, manufacturers, and generic names in parallel
-        const [categoriesRes, formsRes, manufacturersRes, genericNamesRes] = await Promise.all([
-          api.get("/categories/"),
-          api.get("/forms/"),
-          api.get("/manufacturers/"),
-          api.get("/generic-names/"),
-        ]);
-
-        // Set the state only once after all data is retrieved to avoid re-renders
+        const [categoriesRes, formsRes, manufacturersRes, genericNamesRes] =
+          await Promise.all([
+            api.get("/categories/"),
+            api.get("/forms/"),
+            api.get("/manufacturers/"),
+            api.get("/generic-names/"),
+          ]);
         setCategories(categoriesRes.data.data || []);
         setForms(formsRes.data.data || []);
         setManufacturers(manufacturersRes.data.data || []);
@@ -61,10 +76,8 @@ const AddMedicine: React.FC = () => {
         setLoading(false);
       }
     };
-
-    // Call fetchAuxiliaryData once on component mount
     fetchAuxiliaryData();
-  }, []); // Empty dependency array to run only once
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -105,11 +118,16 @@ const AddMedicine: React.FC = () => {
     } catch (error: any) {
       console.error("Error adding medicine:", error);
       const responseError = error.response?.data?.message;
-
-      if (typeof responseError === "string") {
-        setErrorMessage(responseError);
-      } else if (responseError && typeof responseError === "object") {
-        const errorMessages = Object.values(responseError).flat().join(" ");
+  
+      if (responseError && typeof responseError === "object") {
+        // Explicitly cast responseError to expected type
+        const errorMessages = Object.entries(responseError as Record<string, string[]>)
+          .map(([key, messages]) =>
+            messages
+              .map((msg) => `${fieldLabelMap[key] || key}: ${msg}`)
+              .join(" ")
+          )
+          .join(" ");
         setErrorMessage(errorMessages || "Error adding medicine.");
       } else {
         setErrorMessage("Error adding medicine.");
@@ -118,6 +136,7 @@ const AddMedicine: React.FC = () => {
       setSubmitting(false);
     }
   };
+  
 
   return (
     <Box padding={3}>
@@ -125,7 +144,12 @@ const AddMedicine: React.FC = () => {
         Add New Medicine
       </Typography>
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          minHeight="50vh"
+        >
           <CircularProgress />
         </Box>
       ) : (
@@ -240,7 +264,6 @@ const AddMedicine: React.FC = () => {
               </MenuItem>
             ))}
           </TextField>
-
           <FormControlLabel
             control={
               <Checkbox
@@ -261,7 +284,6 @@ const AddMedicine: React.FC = () => {
             }
             label="Featured Medicine"
           />
-
           <Button
             type="submit"
             variant="contained"
@@ -279,7 +301,11 @@ const AddMedicine: React.FC = () => {
         autoHideDuration={6000}
         onClose={() => setSuccessMessage("")}
       >
-        <Alert onClose={() => setSuccessMessage("")} severity="success" sx={{ width: "100%" }}>
+        <Alert
+          onClose={() => setSuccessMessage("")}
+          severity="success"
+          sx={{ width: "100%" }}
+        >
           {successMessage}
         </Alert>
       </Snackbar>
@@ -289,7 +315,11 @@ const AddMedicine: React.FC = () => {
         autoHideDuration={6000}
         onClose={() => setErrorMessage("")}
       >
-        <Alert onClose={() => setErrorMessage("")} severity="error" sx={{ width: "100%" }}>
+        <Alert
+          onClose={() => setErrorMessage("")}
+          severity="error"
+          sx={{ width: "100%" }}
+        >
           {errorMessage}
         </Alert>
       </Snackbar>

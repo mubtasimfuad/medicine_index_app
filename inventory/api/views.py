@@ -47,9 +47,14 @@ class MedicineListView(APIView):
                 app_logger.info("Cache hit for medicine list")
                 return api_response(success=True, data=cached_data)
 
-            # Cache miss - retrieve from DB
+            # Cache miss - retrieve from DB with optimized query
             app_logger.info("Cache miss for medicine list. Querying database.")
-            medicines = MedicineDetail.objects.all()
+            medicines = (
+                MedicineDetail.objects
+                .select_related('generic_name', 'category', 'form', 'manufacturer')
+                .prefetch_related('conditions')
+                .all()
+            )
             data = MedicineDetailSerializer(medicines, many=True).data
             cache_manager.set(MEDICINE_LIST_CACHE_KEY, data, expiration=900)
             return api_response(success=True, data=data)
@@ -61,7 +66,6 @@ class MedicineListView(APIView):
                 message="An error occurred while retrieving medicines.",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
     @swagger_auto_schema(
         operation_description="Create a new medicine entry with provided details. Only accessible to users with appropriate permissions.",
         request_body=MedicineDetailSerializer,
@@ -193,6 +197,13 @@ class MedicineDetailView(APIView):
                 success=False,
                 message="Medicine not found.",
                 status_code=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            error_logger.error(f"Exception in MedicineDetailView PUT method: {str(e)}")
+            return api_response(
+                success=False,
+                message="An error occurred while updating the medicine.",
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     @swagger_auto_schema(

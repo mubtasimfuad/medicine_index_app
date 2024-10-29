@@ -17,48 +17,42 @@ LOCK_KEY_TEMPLATE = "lock_key_{}"
 
 
 def invalidate_cache_for_medicine(instance):
-    # Attempt to acquire necessary locks
     list_lock = cache_manager.acquire_lock(MEDICINE_LIST_CACHE_KEY)
     detail_lock = cache_manager.acquire_lock(
         MEDICINE_DETAIL_CACHE_KEY_TEMPLATE.format(instance.id)
     )
 
     try:
-        # Invalidate the main list cache
+        app_logger.info("Invalidating medicine list cache")
         cache_manager.delete(MEDICINE_LIST_CACHE_KEY)
 
-        # Invalidate detail cache for the specific medicine instance
+        app_logger.info(f"Invalidating detail cache for medicine ID: {instance.id}")
         cache_manager.delete(MEDICINE_DETAIL_CACHE_KEY_TEMPLATE.format(instance.id))
 
-        # Invalidate search caches related to medicine's name and generic name
         query_terms = [instance.name, instance.generic_name.name]
         for term in query_terms:
             search_cache_key = SEARCH_CACHE_KEY_TEMPLATE.format(term)
+            app_logger.info(f"Invalidating search cache for term: {term}")
             cache_manager.delete(search_cache_key)
 
-        app_logger.info(
-            "Cache invalidated for medicine ID %s and related keys.", instance.id
-        )
+        app_logger.info("Cache invalidated for medicine and related keys.")
 
     finally:
-        # Only release locks if they were successfully acquired
+        # Release locks
         if list_lock:
             cache_manager.release_lock(list_lock)
         if detail_lock:
             cache_manager.release_lock(detail_lock)
 
 
+
 @receiver(post_save, sender=MedicineDetail)
 def invalidate_cache_on_save(sender, instance, **kwargs):
-    """
-    Invalidate caches upon creating or updating a MedicineDetail entry.
-    """
+    app_logger.info(f"Triggered post_save for MedicineDetail with ID {instance.id}")
     invalidate_cache_for_medicine(instance)
 
 
 @receiver(post_delete, sender=MedicineDetail)
 def invalidate_cache_on_delete(sender, instance, **kwargs):
-    """
-    Invalidate caches upon deleting a MedicineDetail entry.
-    """
+    app_logger.info(f"Triggered post_delete for MedicineDetail with ID {instance.id}")
     invalidate_cache_for_medicine(instance)
