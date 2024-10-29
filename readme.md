@@ -1,9 +1,8 @@
-
 # Medicine Index Application
 
 A comprehensive web platform that enables users to view, search, and manage medicine information, designed with role-based access for public users and administrators.
 
-![Project Logo](https://i.ibb.co/7pfHbJB/1.png)
+<img src="https://i.ibb.co/7pfHbJB/1.png" alt="Project Logo" width="120">
 
 ---
 
@@ -38,7 +37,7 @@ A comprehensive web platform that enables users to view, search, and manage medi
 
 | Django   | React + TypeScript  | Redis  | MySQL  | Gunicorn |
 |:--------:|:-------------------:|:------:|:------:|:--------:|
-|![Django](https://static.djangoproject.com/img/logos/django-logo-negative.png) | ![React](https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg) | ![Redis](https://upload.wikimedia.org/wikipedia/en/thumb/6/6b/Redis_Logo.svg/800px-Redis_Logo.svg.png) | ![MySQL](https://upload.wikimedia.org/wikipedia/en/thumb/d/dd/MySQL_logo.svg/1200px-MySQL_logo.svg.png) | ![Gunicorn](https://seeklogo.com/images/G/gunicorn-logo-C8172DD072-seeklogo.com.png) |
+|<img src="https://static.djangoproject.com/img/logos/django-logo-negative.png" alt="Django" width="80"> | <img src="https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg" alt="React" width="80"> | <img src="https://upload.wikimedia.org/wikipedia/en/thumb/6/6b/Redis_Logo.svg/800px-Redis_Logo.svg.png" alt="Redis" width="80"> | <img src="https://upload.wikimedia.org/wikipedia/en/thumb/d/dd/MySQL_logo.svg/1200px-MySQL_logo.svg.png" alt="MySQL" width="80"> | <img src="https://seeklogo.com/images/G/gunicorn-logo-C8172DD072-seeklogo.com.png" alt="Gunicorn" width="80"> |
 
 ### Libraries and Tools
 - **Backend**: Django, Django REST Framework, Redis, MySQL
@@ -162,13 +161,13 @@ Swagger documentation for the API is available at:
 ## Screenshots
 
 ### 1. Admin Login
-![Admin Login](readme-img/admin_login.png)
+<img src="readme-img/admin_login.png" alt="Admin Login" width="600">
 
 ### 2. Admin Dashboard
-![Admin Dashboard](readme-img/admin_dashboard.png)
+<img src="readme-img/admin_dashboard.png" alt="Admin Dashboard" width="600">
 
 ### 3. Medicine Search Results
-![Search Results](readme-img/search_result.png)
+<img src="readme-img/search_result.png" alt="Search Results" width="600">
 
 ---
 
@@ -223,3 +222,4 @@ This project is licensed under the MIT License.
 Find the complete codebase on GitHub at [medicine_index_app](https://github.com/mubtasimfuad/medicine_index_app). 
 
 ---
+
