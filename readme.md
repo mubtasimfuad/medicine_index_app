@@ -1,101 +1,108 @@
+
 # Medicine Index Application
 
-Welcome to the Medicine Index Application, a web-based platform developed to enable users to view, search, and manage medicine information. This application supports both public and admin roles, with features for listing, searching, and CRUD operations on medicine data.
+A comprehensive web platform that enables users to view, search, and manage medicine information, designed with role-based access for public users and administrators.
 
-![Project Logo](https://via.placeholder.com/100x100?text=Logo)
+![Project Logo](https://i.ibb.co/7pfHbJB/1.png)
 
 ---
 
 ## Table of Contents
-- [Features](#features)
-- [Technology Stack](#technology-stack)
-- [Setup and Installation](#setup-and-installation)
-- [Environment Variables](#environment-variables)
-- [Running the Application](#running-the-application)
-- [Using the Application](#using-the-application)
-- [Screenshots](#screenshots)
-- [Deployment](#deployment)
-- [Project Structure](#project-structure)
+1. [Features](#features)
+2. [Technology Stack](#technology-stack)
+3. [Setup and Installation](#setup-and-installation)
+4. [Environment Variables](#environment-variables)
+5. [Running the Application](#running-the-application)
+6. [Using the Application](#using-the-application)
+7. [Screenshots](#screenshots)
+8. [Testing](#testing)
+9. [Deployment](#deployment)
+10. [Project Structure](#project-structure)
+11. [License](#license)
 
 ---
 
 ## Features
 
-1. **Medicine Listing**  
-   - Users can view a list of all medicines, including details like name, generic name, manufacturer, description, price, and batch number.
-   
-2. **Search Functionality**  
-   - Users can search for medicines by name or generic name.
-   - Search results highlight matching keywords for improved user experience.
+### Public Users
+- View and search for medicines by name or generic name.
+- Optimized search highlighting for improved user experience.
 
-3. **User Roles and Permissions**  
-   - **Public Users**: Can view and search for medicines.
-   - **Admins**: Can perform full CRUD (Create, Read, Update, Delete) operations on medicines.
+### Admin Users
+- Full CRUD (Create, Read, Update, Delete) operations on medicines.
+- Role-specific access and authentication.
 
 ---
 
 ## Technology Stack
 
-| ![Django](https://static.djangoproject.com/img/logos/django-logo-negative.png) | ![React](https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg) | ![Redis](https://upload.wikimedia.org/wikipedia/en/thumb/6/6b/Redis_Logo.svg/800px-Redis_Logo.svg.png) | ![MySQL](https://upload.wikimedia.org/wikipedia/en/thumb/d/dd/MySQL_logo.svg/1200px-MySQL_logo.svg.png) | ![Gunicorn](https://gunicorn.org/images/gunicorn-logo.png) |
-|:------------------------------------------------------------:|:--------------------------------------------------:|:-------------------------------------------------------------:|:-------------------------------------------------------------:|:------------------------------------------------------------:|
-| Django                                                       | React + TypeScript                                 | Redis                                                          | MySQL                                                          | Gunicorn                                                     |
+| Django   | React + TypeScript  | Redis  | MySQL  | Gunicorn |
+|:--------:|:-------------------:|:------:|:------:|:--------:|
+|![Django](https://static.djangoproject.com/img/logos/django-logo-negative.png) | ![React](https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg) | ![Redis](https://upload.wikimedia.org/wikipedia/en/thumb/6/6b/Redis_Logo.svg/800px-Redis_Logo.svg.png) | ![MySQL](https://upload.wikimedia.org/wikipedia/en/thumb/d/dd/MySQL_logo.svg/1200px-MySQL_logo.svg.png) | ![Gunicorn](https://seeklogo.com/images/G/gunicorn-logo-C8172DD072-seeklogo.com.png) |
 
-### Key Libraries and Tools
+### Libraries and Tools
 - **Backend**: Django, Django REST Framework, Redis, MySQL
 - **Frontend**: React (TypeScript), Axios
-- **Deployment**: Docker, Gunicorn
+- **Deployment**: Docker, Docker Compose
 
 ---
 
 ## Setup and Installation
 
 ### Prerequisites
-Ensure you have the following installed on your machine:
+Ensure the following software is installed:
 - **Python 3.11+**
-- **Node.js** and **npm**
+- **Node.js 18+** and **npm**
 - **Docker** and **Docker Compose**
 
 ### Installation Steps
 
-1. **Clone the repository**:
-    ```bash
-    git clone https://github.com/mubtasimfuad/medicine_index_app.git
-    cd medicine_index_app
-    ```
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/mubtasimfuad/medicine_index_app.git
+   cd medicine_index_app
+   ```
 
 2. **Backend Setup**:
-    - Create and activate a virtual environment:
-      ```bash
-      python3 -m venv venv
-      source venv/bin/activate  # For Unix
-      # or `venv\Scripts\activate` on Windows
-      ```
-    - Install dependencies:
-      ```bash
-      pip install -r requirements.txt
-      ```
+   - Create and activate a virtual environment:
+     ```bash
+     python3 -m venv env
+     source env/bin/activate  # For Unix
+     ```
+   - Install Python dependencies:
+     ```bash
+     pip install -r requirements.txt
+     ```
+   - Run migrations to set up the database:
+     ```bash
+     python manage.py migrate
+     ```
 
-3. **Frontend Setup** (React):
-    - Navigate to the frontend directory and install dependencies:
-      ```bash
-      cd frontend
-      npm install
-      ```
-  
+3. **Frontend Setup (React)**:
+   - Navigate to the frontend directory and install Node.js dependencies:
+     ```bash
+     cd frontend
+     npm install
+     ```
+   - For development, you can run:
+     ```bash
+     npm run dev
+     ```
+
 4. **Environment Variables**:  
-   Rename `.env.example` to `.env` and configure the required environment variables (details below).
+   Configure environment variables in a `.env` file (details in the [Environment Variables](#environment-variables) section).
 
 ---
 
 ## Environment Variables
 
-Configure the `.env` file with the following keys:
+In the `.env` file, configure settings as follows:
 
 ```plaintext
 DEBUG=1
 SECRET_KEY=your_secret_key
-DJANGO_ALLOWED_HOSTS=localhost, 127.0.0.1
-DB_HOST=host.docker.internal  # Use MySQL container host or IP
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+DB_HOST=host.docker.internal
 DB_PORT=3306
 DB_NAME=medicine_index_db
 DB_USER=db_user
@@ -103,69 +110,92 @@ DB_PASSWORD=db_password
 REDIS_HOST=redis://redis:6379
 AWS_ACCESS_KEY_ID=your_aws_access_key
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+USE_S3=False
 ```
 
 ---
 
 ## Running the Application
 
-### Using Docker Compose (Recommended for Production)
+### Docker Setup (Recommended for Production)
 
-To start the application with Docker Compose, ensure the Dockerfile and docker-compose.yml files are correctly set up as shown, then run:
-
+To start the application using Docker Compose:
 ```bash
-docker-compose up --build
+docker-compose up --build -d
 ```
 
-This will start:
-- Django app (`web`) with Gunicorn on port `8000`
-- Redis cache (`redis`) on port `6379`
+This setup includes:
+- Django with Gunicorn on port `8000`
+- Redis cache on port `6379`
+- Nginx serving the application on port `8081`
 
-### Running Locally for Development
+### Local Development
 
-1. **Start Backend Server**:
-    ```bash
-    python manage.py runserver
-    ```
+1. **Backend**:
+   ```bash
+   python manage.py runserver
+   ```
 
-2. **Start Frontend Server**:
-    ```bash
-    cd frontend
-    npm start
-    ```
+2. **Frontend**:
+   ```bash
+   cd frontend
+   npm start
+   ```
 
-The frontend will run on `http://localhost:3000` by default, and backend APIs will be available at `http://localhost:8000`.
+Access the app at `http://localhost:3000` (frontend) and `http://localhost:8000` (backend APIs).
 
 ---
 
 ## Using the Application
 
-- **Public Access**: View and search for medicines.
+- **Public Access**: View and search medicines.
 - **Admin Access**:
-  - Login to the admin dashboard at `/admin`
-  - Full CRUD operations on medicine data are accessible from the dashboard.
+  - Login to the Django admin dashboard at `/admin`.
+  - Perform CRUD operations for medicine management.
 
-### API Endpoints (Swagger Documentation)
-- Swagger documentation is available at `http://localhost:8000/swagger/` for detailed API usage.
+### API Documentation
+Swagger documentation for the API is available at:
+- `http://localhost:8000/swagger/`
 
 ---
 
 ## Screenshots
 
-### 1. Dashboard
-![Dashboard](https://via.placeholder.com/800x400?text=Dashboard+Screenshot)
+### 1. Admin Login
+![Admin Login](readme-img/admin_login.png)
 
-### 2. Medicine List
-![Medicine List](https://via.placeholder.com/800x400?text=Medicine+List+Screenshot)
+### 2. Admin Dashboard
+![Admin Dashboard](readme-img/admin_dashboard.png)
 
-### 3. Search Functionality
-![Search Results](https://via.placeholder.com/800x400?text=Search+Results+Screenshot)
+### 3. Medicine Search Results
+![Search Results](readme-img/search_result.png)
+
+---
+
+## Testing
+
+The project includes unit tests and integration tests written using `pytest`. To run all tests:
+
+1. For a local environment:
+   ```bash
+   pytest -v
+   ```
+2. Within the Docker container:
+   ```bash
+   docker exec -it medicine_index_app-web-1 pytest -v
+   ```
+
+Unit and integration tests cover all crucial features, ensuring reliable TDD development.
 
 ---
 
 ## Deployment
 
-The application is Docker-ready for easy deployment in production. Gunicorn is used as the WSGI server to serve Django, and Docker Compose manages Redis and other services for optimized performance.
+The application is production-ready with Docker and Nginx configurations. **Gunicorn** serves Django in a secure, scalable environment, with Redis for caching.
+
+**On EC2 or Cloud Server**:
+1. Open necessary ports on your security group (e.g., `8081`).
+2. Deploy using `docker-compose` as instructed above.
 
 ---
 
@@ -186,13 +216,10 @@ medicine_index_app/
 
 ---
 
-## Contributing
-
-Feel free to fork this repository and submit pull requests. All contributions are welcome!
-
 ## License
 
 This project is licensed under the MIT License.
 
-For the complete codebase, visit the GitHub repository at [medicine_index_app](https://github.com/mubtasimfuad/medicine_index_app). 
+Find the complete codebase on GitHub at [medicine_index_app](https://github.com/mubtasimfuad/medicine_index_app). 
 
+---
