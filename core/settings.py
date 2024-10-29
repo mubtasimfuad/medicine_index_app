@@ -25,7 +25,7 @@ import environ
 env = environ.Env(DEBUG=(bool, False))
 environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 
-DEBUG = env("DEBUG")
+DEBUG = True
 SECRET_KEY = env("SECRET_KEY")
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost"])
 
@@ -39,11 +39,45 @@ DATABASES = {
         "PORT": env("DB_PORT"),
     }
 }
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY")
-AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME")
-AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+import boto3
+import os
+from botocore.exceptions import NoCredentialsError, PartialCredentialsError
+
+## Optional: AWS profile name from environment, or fallback to local
+AWS_PROFILE_NAME = os.getenv("AWS_PROFILE_NAME")
+USE_S3 = os.getenv("USE_S3", "False") == "True"  
+
+# If USE_S3 is true, set up S3 session and storage configuration
+if USE_S3:
+    if AWS_PROFILE_NAME:
+        session = boto3.Session(profile_name=AWS_PROFILE_NAME)
+    else:
+        session = boto3.Session(
+            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        )
+
+    # S3 client using the session
+    s3 = session.client("s3")
+
+    # S3 settings
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
+    AWS_DEFAULT_ACL = 'public-read'
+
+    # Media URL pointing to S3
+    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
+
+else:
+    # Default to local file storage if S3 is not used
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+# Static files settings
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Application definition
 REST_FRAMEWORK = {
@@ -51,12 +85,12 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.AllowAny",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.AllowAny",),
 }
-REDIS_HOST = os.getenv('REDIS_HOST', 'localhost')  # Use `redis` as the hostname in Docker
-REDIS_PORT = os.getenv('REDIS_PORT', '6379')
+REDIS_HOST = os.getenv(
+    "REDIS_HOST", "localhost"
+)  # Use `redis` as the hostname in Docker
+REDIS_PORT = os.getenv("REDIS_PORT", "6379")
 
 CACHES = {
     "default": {
@@ -64,7 +98,7 @@ CACHES = {
         "LOCATION": f"redis://{REDIS_HOST}:{REDIS_PORT}/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
+        },
     }
 }
 
@@ -140,7 +174,7 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
 }
-CORS_ALLOWED_ORIGINS= "*"
+CORS_ALLOW_ALL_ORIGINS = True
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",

@@ -13,6 +13,10 @@ from ..utils import api_response
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 
+from rest_framework.pagination import PageNumberPagination
+
+class ManufacturerPagination(PageNumberPagination):
+    page_size = 10  # Adjust page size as needed
 
 class GenericNameListCreateView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
@@ -463,7 +467,7 @@ class ManufacturerListCreateView(APIView):
 
 
 class ManufacturerRetrieveUpdateDestroyView(APIView):
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.AllowAny]
 
     def get_object(self, pk):
         try:

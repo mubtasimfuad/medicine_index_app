@@ -88,3 +88,18 @@ class RedisCache:
             app_logger.info("Released lock.")
         except redis.RedisError as e:
             error_logger.error(f"Error releasing lock: {e}")
+
+    def release_lock(self, lock):
+        """
+        Release the given lock.
+        """
+        if lock is None:
+            app_logger.warning("Attempted to release a None lock, skipping.")
+            return
+
+        try:
+            lock.release()
+            app_logger.info("Released lock.")
+        except redis.RedisError as e:
+            error_logger.error(f"Error releasing lock: {e}")
+

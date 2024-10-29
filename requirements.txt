@@ -15,3 +15,5 @@ django-redis
 drf_yasg
 gunicorn
 django-cors-headers
+faker
+boto3

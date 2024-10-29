@@ -2,6 +2,9 @@
 import uuid
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+from django.utils.text import slugify
+import os
+
 
 # Enum choices for unit of measurement
 class UnitOfMeasurement(models.TextChoices):
@@ -22,6 +25,13 @@ class CategoryType(models.TextChoices):
     OTHER = "OTH", _("Other")
 
 
+def upload_to_category(instance, filename):
+    max_length = 80  # Allow some space for directory and unique suffix
+    name, ext = os.path.splitext(filename)
+    short_name = slugify(name)[:max_length]  # Shorten and slugify the name
+    return f"category_images/{short_name}{ext}"
+
+
 class MedicineCategory(models.Model):
     name = models.CharField(max_length=150, unique=True)
     description = models.TextField(blank=True, null=True)
@@ -29,7 +39,7 @@ class MedicineCategory(models.Model):
         max_length=3, choices=CategoryType.choices, default=CategoryType.OTHER
     )
     image = models.ImageField(
-        upload_to="category_images/", blank=True, default="default_image.jpg"
+        upload_to=upload_to_category, blank=True, default="default_image.jpg"
     )
 
     def __str__(self):
@@ -81,12 +91,20 @@ class TherapeuticClass(models.Model):
         return f"{self.name} - {self.subclass_name}"
 
 
+def upload_to_manufacturer(instance, filename):
+    # Get the file extension
+    ext = filename.split('.')[-1]
+    # Use UUID to generate a unique filename
+    filename = f"{uuid.uuid4()}.{ext}"
+    # Return the complete file path for S3
+    return os.path.join("manufacturer_images/", filename)
+
 class Manufacturer(models.Model):
     name = models.CharField(max_length=200, unique=True)
     contact_info = models.TextField(blank=True, null=True)
     website = models.URLField(blank=True)
     logo = models.ImageField(
-        upload_to="manufacturer_images/", blank=True, default="default_logo.jpg"
+        upload_to=upload_to_manufacturer, blank=True, default="default_logo.jpg"
     )
 
     def __str__(self):

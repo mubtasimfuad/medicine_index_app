@@ -1,3 +1,4 @@
+import uuid
 from rest_framework import serializers
 from ..models import (
     MedicineDetail,
@@ -58,3 +59,9 @@ class ManufacturerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Manufacturer
         fields = "__all__"
+
+    def to_representation(self, instance):
+        representation = super().to_representation(instance)
+        if instance.logo:
+            representation["logo"] = instance.logo.url 
+        return representation

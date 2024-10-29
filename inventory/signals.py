@@ -16,9 +16,8 @@ SEARCH_CACHE_KEY_TEMPLATE = "medicine_search_{}"
 LOCK_KEY_TEMPLATE = "lock_key_{}"
 
 
-# Helper function to invalidate caches for MedicineDetail instance
 def invalidate_cache_for_medicine(instance):
-    # Acquire necessary locks
+    # Attempt to acquire necessary locks
     list_lock = cache_manager.acquire_lock(MEDICINE_LIST_CACHE_KEY)
     detail_lock = cache_manager.acquire_lock(
         MEDICINE_DETAIL_CACHE_KEY_TEMPLATE.format(instance.id)
@@ -42,9 +41,11 @@ def invalidate_cache_for_medicine(instance):
         )
 
     finally:
-        # Release locks
-        cache_manager.release_lock(list_lock)
-        cache_manager.release_lock(detail_lock)
+        # Only release locks if they were successfully acquired
+        if list_lock:
+            cache_manager.release_lock(list_lock)
+        if detail_lock:
+            cache_manager.release_lock(detail_lock)
 
 
 @receiver(post_save, sender=MedicineDetail)
