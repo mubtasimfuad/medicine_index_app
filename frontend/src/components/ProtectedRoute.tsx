@@ -1,10 +1,12 @@
-import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+// ProtectedRoute.tsx
+import React from "react";
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "../services/AuthContext";
 
 const ProtectedRoute: React.FC = () => {
-  const isAuthenticated = Boolean(localStorage.getItem('authToken')); // Adjust based on your authentication setup
+  const { isAuthenticated } = useAuth();
 
-  return isAuthenticated ? <Outlet /> : <Outlet /> ;
+  return isAuthenticated ? <Outlet /> : <Navigate to="/login" />;
 };
 
 export default ProtectedRoute;

@@ -3,7 +3,7 @@
 import json
 import logging
 from rest_framework.views import APIView
-from rest_framework import status
+from rest_framework import status, permissions
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from django.db.models import Q
@@ -13,6 +13,9 @@ from inventory.utils import api_response
 from .serializers import MedicineDetailSerializer
 from ..models import MedicineDetail
 from utils.redis_cache import RedisCache
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+
 
 # Redis cache manager
 cache_manager = RedisCache()
@@ -25,39 +28,54 @@ app_logger = logging.getLogger("app_logger")
 error_logger = logging.getLogger("error_logger")
 
 
+class StandardResultsPagination(PageNumberPagination):
+    page_size = 10  # Default items per page
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
 class MedicineListView(APIView):
     permission_classes = [IsAdminOrReadOnly]
+    pagination_class = StandardResultsPagination
 
     @swagger_auto_schema(
-        operation_description="Retrieve a list of all medicines, with data caching enabled for faster retrieval on subsequent requests.",
+        operation_description="Retrieve a paginated list of all medicines with optional caching.",
         responses={
             200: openapi.Response(
-                description="A list of medicines",
+                description="A paginated list of medicines",
                 schema=MedicineDetailSerializer(many=True),
             ),
             500: "Internal Server Error - Error occurred while retrieving medicines.",
         },
     )
     def get(self, request):
-        """Retrieve a list of medicines with caching."""
+        """Retrieve a paginated list of medicines with optional caching."""
         try:
-            app_logger.info("Attempting to retrieve cached medicine list")
-            cached_data = cache_manager.get(MEDICINE_LIST_CACHE_KEY)
-            if cached_data:
-                app_logger.info("Cache hit for medicine list")
-                return api_response(success=True, data=cached_data)
+            app_logger.info("Attempting to retrieve paginated medicine list")
+            page = request.query_params.get("page", 1)
+            cache_key = f"{MEDICINE_LIST_CACHE_KEY}_page_{page}"
 
-            # Cache miss - retrieve from DB with optimized query
-            app_logger.info("Cache miss for medicine list. Querying database.")
+            # Check for cached data
+            # cached_data = cache_manager.get(cache_key)
+            # if cached_data:
+            #     app_logger.info("Cache hit for paginated medicine list")
+            #     return api_response(success=True, data=cached_data)
+
+            # Retrieve and paginate data
             medicines = (
-                MedicineDetail.objects
-                .select_related('generic_name', 'category', 'form', 'manufacturer')
-                .prefetch_related('conditions')
+                MedicineDetail.objects.select_related(
+                    "generic_name", "category", "form", "manufacturer"
+                )
+                .prefetch_related("conditions")
                 .all()
             )
-            data = MedicineDetailSerializer(medicines, many=True).data
-            cache_manager.set(MEDICINE_LIST_CACHE_KEY, data, expiration=900)
-            return api_response(success=True, data=data)
+            paginator = StandardResultsPagination()
+            result_page = paginator.paginate_queryset(medicines, request)
+            serialized_data = MedicineDetailSerializer(result_page, many=True).data
+
+            # Cache the paginated results
+            cache_manager.set(cache_key, serialized_data, expiration=900)
+            return paginator.get_paginated_response(serialized_data)
 
         except Exception as e:
             error_logger.error("Error in MedicineListView GET method: %s", str(e))
@@ -66,6 +84,7 @@ class MedicineListView(APIView):
                 message="An error occurred while retrieving medicines.",
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
     @swagger_auto_schema(
         operation_description="Create a new medicine entry with provided details. Only accessible to users with appropriate permissions.",
         request_body=MedicineDetailSerializer,
@@ -242,106 +261,62 @@ class MedicineDetailView(APIView):
             )
 
 
-class MedicineSearchView(APIView):
-    """
-    A view to perform a full-text search on medicines with caching, including highlighting metadata with start and end indices.
-    """
+from rest_framework.response import Response
+from inventory.models import MedicineCategory, MedicineForm, Manufacturer
 
+
+class MedicineSearchView(APIView):
     permission_classes = [IsAdminOrReadOnly]
 
-    @swagger_auto_schema(
-        operation_description="Search for medicines by name, generic name, or using specific filters. "
-        "Accessible to users with appropriate permissions.",
-        manual_parameters=[
-            openapi.Parameter(
-                "q",
-                openapi.IN_QUERY,
-                description="Search query string",
-                type=openapi.TYPE_STRING,
-                required=True,
-            ),
-            openapi.Parameter(
-                "filters",
-                openapi.IN_QUERY,
-                description="Additional filters in JSON format",
-                type=openapi.TYPE_STRING,
-            ),
-        ],
-        responses={
-            200: openapi.Response(
-                description="Search results with highlight positions",
-                schema=MedicineDetailSerializer(many=True),
-            ),
-            400: "Bad Request - Query parameter 'q' is required.",
-            403: "Forbidden - You do not have permission to access this resource.",
-            500: "Internal Server Error",
-        },
-    )
     def get(self, request):
-        """Perform a full-text search on medicines with caching and highlight metadata."""
-        query = request.query_params.get("q", "").strip()
-        filters = request.query_params.get("filters", "")
-        cache_key = SEARCH_CACHE_KEY_TEMPLATE.format(query)
-
-        # Validate required search parameter
-        if not query:
-            return api_response(
-                success=False,
-                message="Query parameter 'q' is required for search.",
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Try to retrieve cached results
-        cached_data = cache_manager.get(cache_key)
-        if cached_data:
-            app_logger.info(f"Cache hit for search query: '{query}'")
-            return api_response(success=True, data=cached_data)
-
-        # Proceed with database search if cache miss
-        app_logger.info(f"Cache miss for search query: '{query}' - querying database")
+        """Perform a paginated search with caching and keyword highlighting."""
         try:
+            app_logger.info("GET request received for MedicineSearchView")
+            query = request.query_params.get("q", "").strip()
+            filters = request.query_params.get("filters", "")
+            page = request.query_params.get("page", 1)
+            cache_key = f"{SEARCH_CACHE_KEY_TEMPLATE.format(query)}_page_{page}"
+
+            if not query:
+                return api_response(
+                    success=False,
+                    message="Query parameter 'q' is required for search.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Check for cached response
+            cached_data = cache_manager.get(cache_key)
+            if cached_data:
+                app_logger.info(f"Cache hit for search query '{query}' on page {page}")
+                return Response(cached_data)
+
+            # Construct filters using ID mappings
             search_filter = Q(name__icontains=query) | Q(
                 generic_name__name__icontains=query
             )
-
-            # Apply additional filters, if any
             if filters:
-                try:
-                    filter_params = json.loads(filters)
-                    for key, value in filter_params.items():
-                        search_filter &= Q(**{key: value})
-                except json.JSONDecodeError:
-                    error_logger.error(f"Invalid JSON format for filters: {filters}")
-                    return api_response(
-                        success=False,
-                        message="Filters must be a valid JSON string.",
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                    )
+                filter_params = json.loads(filters)
+                search_filter = self.build_search_filter(search_filter, filter_params)
 
-            # Perform the search and serialize the results
+            # Retrieve and paginate the results
             medicines = MedicineDetail.objects.filter(search_filter).distinct()
-            results = []
-            for medicine in medicines:
-                serialized_data = MedicineDetailSerializer(medicine).data
-                matches = {
-                    "name": self.get_match_indices_with_end(medicine.name, query),
-                    "generic_name": (
-                        self.get_match_indices_with_end(
-                            medicine.generic_name.name, query
-                        )
-                        if medicine.generic_name
-                        else []
-                    ),
-                }
-                # Append the matches metadata to each result
-                serialized_data["matches"] = matches
-                results.append(serialized_data)
+            paginator = StandardResultsPagination()
+            result_page = paginator.paginate_queryset(medicines, request)
 
-            # Cache the search results with highlight metadata
-            cache_manager.set(
-                cache_key, results, expiration=600
-            )  # Cache for 10 minutes
-            return api_response(success=True, data=results)
+            # No results handling
+            if not result_page:
+                empty_response = paginator.get_paginated_response([])
+                cache_manager.set(cache_key, empty_response.data, expiration=600)
+                return empty_response
+
+            # Serialize and cache results
+            results = [
+                self._add_highlighting(MedicineDetailSerializer(med).data, query)
+                for med in result_page
+            ]
+            paginated_response = paginator.get_paginated_response(results)
+            cache_manager.set(cache_key, paginated_response.data, expiration=600)
+            return paginated_response
 
         except Exception as e:
             error_logger.error(f"Error in MedicineSearchView GET method: {str(e)}")
@@ -351,10 +326,51 @@ class MedicineSearchView(APIView):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    def build_search_filter(self, search_filter, filter_params):
+        """Helper to build a search filter from filter parameters."""
+        try:
+            if "category" in filter_params and filter_params["category"]:
+                category_id = MedicineCategory.objects.get(
+                    id=filter_params["category"]
+                ).id
+                search_filter &= Q(category_id=category_id)
+
+            if "form" in filter_params and filter_params["form"]:
+                form_id = MedicineForm.objects.get(id=filter_params["form"]).id
+                search_filter &= Q(form_id=form_id)
+
+            if "manufacturer" in filter_params and filter_params["manufacturer"]:
+                manufacturer_id = Manufacturer.objects.get(
+                    id=filter_params["manufacturer"]
+                ).id
+                search_filter &= Q(manufacturer_id=manufacturer_id)
+
+        except MedicineCategory.DoesNotExist:
+            error_logger.error("Invalid category filter")
+        except MedicineForm.DoesNotExist:
+            error_logger.error("Invalid form filter")
+        except Manufacturer.DoesNotExist:
+            error_logger.error("Invalid manufacturer filter")
+
+        return search_filter
+
+    def _add_highlighting(self, data, query):
+        """Adds highlight positions to data."""
+        matches = {
+            "name": self.get_match_indices_with_end(data["name"], query),
+            "generic_name": (
+                self.get_match_indices_with_end(
+                    data["generic_name_details"]["name"], query
+                )
+                if "generic_name_details" in data and data["generic_name_details"]
+                else []
+            ),
+        }
+        data["matches"] = matches
+        return data
+
     def get_match_indices_with_end(self, text, query):
-        """
-        Helper method to find start and end indices of `query` in `text`.
-        """
+        """Helper to find start and end indices of `query` in `text`."""
         matches = []
         query = query.lower()
         text = text.lower()

@@ -8,7 +8,7 @@ import ManufacturerTab from './Auxiliary/ManufacturerTab';
 const AuxiliaryData: React.FC = () => {
   const [currentTab, setCurrentTab] = useState(0);
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
   };
 

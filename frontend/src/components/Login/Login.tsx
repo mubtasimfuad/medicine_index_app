@@ -1,35 +1,40 @@
-import React, { useState } from 'react';
-import { Box, Typography, Container, Snackbar, Alert } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { LoginContainer, FormContainer, StyledTextField, StyledButton, Title, ForgotPasswordLink } from './Login.styles';
+// Login.tsx
+import React, { useState } from "react";
+import { Box, Typography, Container, Snackbar, Alert, CircularProgress } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { useAuth } from "../../services/AuthContext";
+import { LoginContainer, FormContainer, StyledTextField, StyledButton, Title, ForgotPasswordLink } from "./Login.styles";
 
 const Login: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [openSnackbar, setOpenSnackbar] = useState(false);  // State for showing error
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false); // Add loading state
+  const [openSnackbar, setOpenSnackbar] = useState(false);
+  const { login } = useAuth(); // Get login function from AuthContext
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true); // Set loading to true when login starts
     try {
-      // Call login API
-      const response = await axios.post('http://localhost:8000/api/auth/login/', {
+      const response = await axios.post("http://localhost:8000/api/auth/login/", {
         username,
         password,
       });
 
-      // Store access and refresh tokens in local storage
       const { access, refresh } = response.data;
-      localStorage.setItem('access', access);
-      localStorage.setItem('refresh', refresh);
+      localStorage.setItem("access", access);
+      localStorage.setItem("refresh", refresh);
 
-      // Redirect to dashboard after successful login
-      navigate('/dashboard');
+      login(); // Update auth state
+      navigate("/dashboard");
     } catch (err) {
-      setError('Invalid credentials, please try again.');
-      setOpenSnackbar(true);  // Show error message
+      setError("Invalid credentials, please try again.");
+      setOpenSnackbar(true);
+    } finally {
+      setLoading(false); // Reset loading state after request completion
     }
   };
 
@@ -61,8 +66,8 @@ const Login: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            <StyledButton type="submit" fullWidth variant="contained">
-              Sign In
+            <StyledButton type="submit" fullWidth variant="contained" disabled={loading}>
+              {loading ? <CircularProgress size={24} color="inherit" /> : "Sign In"}
             </StyledButton>
           </Box>
           <Typography align="center" variant="body2">
@@ -71,9 +76,8 @@ const Login: React.FC = () => {
         </FormContainer>
       </Container>
 
-      {/* Error Snackbar */}
       <Snackbar open={openSnackbar} autoHideDuration={6000} onClose={() => setOpenSnackbar(false)}>
-        <Alert onClose={() => setOpenSnackbar(false)} severity="error" sx={{ width: '100%' }}>
+        <Alert onClose={() => setOpenSnackbar(false)} severity="error" sx={{ width: "100%" }}>
           {error}
         </Alert>
       </Snackbar>
