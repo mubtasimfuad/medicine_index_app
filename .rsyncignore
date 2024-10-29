@@ -1,0 +1,14 @@
+# Ignore frontend dependencies
+node_modules
+frontend/node_modules
+frontend/dist
+
+# Ignore Django virtual environment
+env
+
+# Ignore Python cache and compiled files
+__pycache__
+*.pyc
+
+# Ignore any log files or debug files
+*.log

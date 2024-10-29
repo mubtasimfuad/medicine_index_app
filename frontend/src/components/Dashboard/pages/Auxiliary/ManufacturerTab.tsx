@@ -34,7 +34,7 @@ const ManufacturerTab: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
 
-  const MEDIA_URL = "http://localhost:8000";
+  const MEDIA_URL = "/media";
 
   useEffect(() => {
     fetchManufacturers();

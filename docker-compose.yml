@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  # Django & React (combined in one service)
+  web:
+    build: .
+    command: gunicorn --bind 0.0.0.0:8000 core.wsgi:application
+    volumes:
+      - ./staticfiles:/app/staticfiles  # Ensure Django can access collected static files
+    env_file:
+      - .env  # Include any environment variables for Django configuration
+    expose:
+      - "8000"  # Internal access to Django app
+    networks:
+      - backend
+    depends_on:
+      - redis
+
+  # Redis for caching
   redis:
     image: redis:alpine
     networks:
@@ -11,21 +27,22 @@ services:
       timeout: 5s
       retries: 3
 
-  web:
-    build: .
-    command: gunicorn --bind 0.0.0.0:8000 core.wsgi:application
-    volumes:
-      - .:/app  # Mount the current directory for code changes
-      - ./staticfiles:/app/staticfiles  # Ensure Nginx can access collected static files
-    env_file:
-      - .env
+  # Nginx to serve as a reverse proxy
+  nginx:
+    image: nginx:alpine
+    container_name: medicine_index_app-nginx
+    ports:
+      - "80:80"
     depends_on:
-      redis:
-        condition: service_healthy
+      - web
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf  # Ensure nginx.conf exists at this path
+      - ./frontend/dist:/usr/share/nginx/html  # For serving the React app
+      - ./staticfiles:/app/staticfiles  # Serving Django static files
+      - ./media:/app/media  # Serving Django media files
     networks:
       - backend
-    ports:
-      - "8000:8000"  # Make web accessible on port 8000 for internal proxying
+
 
 networks:
   backend:

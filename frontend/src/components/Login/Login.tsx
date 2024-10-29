@@ -19,7 +19,7 @@ const Login: React.FC = () => {
     e.preventDefault();
     setLoading(true); // Set loading to true when login starts
     try {
-      const response = await axios.post("http://localhost:8000/api/auth/login/", {
+      const response = await axios.post("/api/auth/login/", {
         username,
         password,
       });
