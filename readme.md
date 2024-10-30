@@ -4,6 +4,9 @@ A comprehensive web platform that enables users to view, search, and manage medi
 
 <img src="https://i.ibb.co/7pfHbJB/1.png" alt="Project Logo" width="120">
 
+The app is live at:
+[http://52.73.8.84:8081/](http://52.73.8.84:8081/)
+
 ---
 
 ## Table of Contents
